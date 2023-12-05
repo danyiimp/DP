@@ -1,0 +1,6 @@
+icecream
+matplotlib
+numpy
+scipy
+pandas
+openpyxl
