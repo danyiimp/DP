@@ -1,16 +1,17 @@
 {
     "_info": "Конфигурационный файл. Откройте README.md с комментариями к переменным",
 
-    "N": 11,
-    "T_1": 360,
-    "T_2": 420,
-    "T_3": 2000,
-    "T_END": 8500,
-    "DPITCH_DT": 0,
-    "PITCH_2": 0,
+    "N": 38,
+    "T_1": 400,
+    "T_2": 550,
+    "T_3": 1000,
+    "T_END": 1000,
+    "DEG": true,
+    "DPITCH_DT": -0.1,
+    "PITCH_2": -1,
 
     "DEBUG": true,
     "INTERACTIVE": false,
     "EXCEL": false,
-    "EXCEL_FILE": "OUTLOL.xlsx"
+    "EXCEL_FILE": "test.xlsx"
 }

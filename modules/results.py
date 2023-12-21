@@ -29,7 +29,7 @@ def parseToResults(t_values, state_vector_values):
 def writeToExcel(results: list, filename: str):
     if not d.EXCEL:
         return
-    
+    results = [(t_values, v_x, v_y, x * 1000, y * 1000, m) for t_values, x, y, v_x, v_y, m in results]
     #Для фиксации времени исполнения
     ic()
     #columns = ['t, с', 'm, кг' ,'v_x, м/с', 'v_y, м/с', 'x, км', 'y, км', 'h, км', 'V, м/с', 'r, км', 'ϑ, град','θ_c, град', 'α, град', 'ϕ, град']
@@ -69,8 +69,8 @@ def createPlot(results: list, num_points: int = 1000, H_MS: float = d.H_MS_11, i
     fig, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)
 
-    plt.gca().set_xlim([-2200, 2200])
-    plt.gca().set_ylim([-2200, 2200])
+    # plt.gca().set_xlim([-2200, 2200])
+    # plt.gca().set_ylim([-2200, 2200])
 
     ax.set_aspect('equal')
 
@@ -79,6 +79,7 @@ def createPlot(results: list, num_points: int = 1000, H_MS: float = d.H_MS_11, i
     target_orbit = Circle((0, 0), d.R_MOON + H_MS, fill=False, color="red", linestyle="--")
     ax.add_patch(moon)
     ax.add_patch(target_orbit)
+    ax.set(xlim=[-500, 1000], ylim=[1000, 2200])
 
     if not interactive:
         l, = plt.plot(x_results, h_results, visible=True)

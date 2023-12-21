@@ -5,7 +5,7 @@ import modules.data as d
 
 class MathModel():
     def __init__(self, M_0: float, M_FUEL_MAX: float, W_EFF: float, THRUST: float, DPITCH_DT: float, PITCH_2: float, T_0: float, T_1: float, T_2: float, T_3: float, T_END: float, T_VERTICAL: d.T_VERTICAL, MU_BODY: d.MU_MOON, R_BODY: d.R_MOON) -> None:
-        self.M_0 = M_0
+        self._M_0 = M_0
         self._M_FUEL_MAX = M_FUEL_MAX
         
         self._W_EFF = W_EFF
@@ -31,20 +31,20 @@ class MathModel():
     """
 
     @property
+    def T_1(self) -> float:
+        return self._T_1
+    
+    @T_1.setter
+    def T_1(self, value: float) -> None:
+        self._T_1 = value
+
+    @property
     def T_2(self) -> float:
         return self._T_2
     
     @T_2.setter
     def T_2(self, value: float) -> None:
         self._T_2 = value
-
-    @property
-    def T_3(self) -> float:
-        return self._T_3
-    
-    @T_3.setter
-    def T_3(self, value: float) -> None:
-        self._T_3 = value
 
     @property
     def DPITCH_DT(self) -> float:
@@ -98,7 +98,7 @@ class MathModel():
         if 0 <= t <= self._T_VERTICAL:
             return pi / 2
         elif self._T_VERTICAL < t <= self._T_1:
-            return pi / 2 - self._DPITCH_DT * (t - self._T_VERTICAL)
+            return pi / 2 + self._DPITCH_DT * (t - self._T_VERTICAL)
         elif self._T_2 <= t <= self._T_END:
             return self._PITCH_2
         else:
@@ -111,7 +111,7 @@ class MathModel():
         """
         if self.off_thrust:
             return 0
-        if self._T_0 <= t <= self._T_1 or self._T_2 <= t <= self._T_3:
+        if self._T_0 <= t <= self._T_1 or self._T_2 < t <= self._T_3:
             return self._THRUST
         else:
             return 0
@@ -167,23 +167,25 @@ class MathModel():
     Уравнения движения
     """
 
-    def dVx_dT(self, t: float, x: float, y: float) -> float:
+    def dVx_dT(self, t: float, x: float, y: float, m: float) -> float:
         """
         :param x: координата по оси X
         :param y: координата по оси Y
+        :param m: текущая масса
         :param t: текущее время
         :return: производная скорости на оси X по времени
         """
-        return self.getThrust(t) * cos(self.getPitch(t)) / self.M_0 + self.getBodyGA_X(x, y)
+        return self.getThrust(t) * cos(self.getPitch(t)) / m + self.getBodyGA_X(x, y)
 
-    def dVy_dT(self, t: float, x: float, y: float) -> float:
+    def dVy_dT(self, t: float, x: float, y: float, m: float) -> float:
         """
         :param x: координата по оси X
         :param y: координата по оси Y
+        :param m: текущая масса
         :param t: текущее время
         :return: производная скорости по оси Y по времени
         """
-        return self.getThrust(t) * sin(self.getPitch(t)) / self.M_0 + self.getBodyGA_Y(x, y)
+        return self.getThrust(t) * sin(self.getPitch(t)) / m + self.getBodyGA_Y(x, y)
 
     def dX_dT(self, v_x: float):
         return v_x

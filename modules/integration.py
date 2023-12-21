@@ -3,8 +3,6 @@ import numpy as np
 from icecream import ic
 from typing import Callable
 from functools import partial
-from scipy.integrate._ivp.rk import RK45, OdeSolver, rk_step
-from scipy.integrate._ivp.common import validate_tol, warn_extraneous
 
 from modules.math_model import MathModel
 import modules.data as d
@@ -22,22 +20,22 @@ def integrateFunction(math_model: MathModel) -> Callable:
         new_state_vector = np.zeros((5,))
         new_state_vector[0] = math_model.dX_dT(state_vector[2])
         new_state_vector[1] = math_model.dY_dT(state_vector[3])
-        new_state_vector[2] = math_model.dVx_dT(t, state_vector[0], state_vector[1])
-        new_state_vector[3] = math_model.dVy_dT(t, state_vector[0], state_vector[1])
+        new_state_vector[2] = math_model.dVx_dT(t, state_vector[0], state_vector[1], state_vector[4])
+        new_state_vector[3] = math_model.dVy_dT(t, state_vector[0], state_vector[1], state_vector[4])
         new_state_vector[4] = math_model.dM_dT(t)
         return new_state_vector
     return partial(realIntegrateFunction, math_model=math_model)
 
-
 class myRK():
     #Количество решений этим методом. Для нейминга progressBar
     _number_of_calc = 0
-    def __init__(self, fun, math_model: MathModel, H_MS: float, y0, t0=d.T_0, t_bound=d.T_END, dt=d.DELTA_T):
+    def __init__(self, fun, math_model: MathModel, H_MS: float, y0, critical_times: list, t0=d.T_0, t_bound=d.T_END, dt=d.DELTA_T):
         #Параметры для реинициализации
         self.__reset_fun = fun
         self.__reset_H_MS = H_MS
         self.__reset_t0 = t0
         self.__reset_y0 = y0
+        self.__reset_critical_times = critical_times
         self.__reset_t_bound = t_bound
         self.__dt = dt
 
@@ -47,6 +45,7 @@ class myRK():
         self.initial_dt = dt
         self.dt = dt
         self._H_MS = H_MS
+        self.critical_times = critical_times
 
         self.t = t0
         self.y_old = y0
@@ -56,29 +55,27 @@ class myRK():
         self.status = "running"
 
     def step(self):
-        self.t += self.dt 
-                
         self.y_old = self.y
 
         k1 = self.fun(self.t, self.y_old)
         k2 = self.fun(self.t + self.dt/2, self.y_old + self.dt/2 * k1)
         k3 = self.fun(self.t + self.dt/2, self.y_old + self.dt/2 * k2)
         k4 = self.fun(self.t + self.dt, self.y_old + self.dt * k3)
-        
+
         self.y = self.y_old + self.dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+        self.t += self.dt 
 
         self.dt_prev = self.dt
         self._step_back_allowed = True
 
         if np.isclose(self.t, self.t_bound, atol=1e-8):
             self.status = "finished"
-        # if self.t + self.dt > self.t_bound:
-        #     self.status = "finished"
 
     def _progressBar(self, current_step: int, total_steps: int, update_step_count=1000):
         """
         Вообще это универсальный метод, но чтобы не плодить сущности, является методом RK
         """
+        return
         if current_step % update_step_count != 0 and current_step != total_steps and current_step != 1:
             return
         progress = current_step / total_steps
@@ -117,6 +114,8 @@ class myRK():
         #Инициализация списков для хранения результатов
         t_values = []
         state_vector_values = []
+        cr_times = iter(self.critical_times)
+        cr_t = next(cr_times, None)
         
         while self.status == "running":
             #TODO FIX THIS
@@ -128,14 +127,12 @@ class myRK():
             #     # ic(self.t, self.y[4])
             #     print("\nМАССА УШЛА")
             #     break
+
             #Реализация уменьшения шага для повышения точности конечной скорости
             if not self.math_model.off_thrust:
                 stepped_over, deviation = self.math_model.endCondition(self._H_MS, self.y[2], self.y[3], self.t)
                 
                 if deviation < accuracy:
-                    t_values.append(self.t)
-                    state_vector_values.append(self.y)
-
                     if stop_on_boundary:
                         self.status == "finished"
                         self._progressBar(1, 1)
@@ -158,9 +155,28 @@ class myRK():
                 if stepped_over:
                     self.step_back()
                     self.step_reduce()
-                    self.step()
+                    t_values.pop()
+                    state_vector_values.pop()
                     continue
 
+            if cr_t:
+                step_to_cr_t = cr_t - self.t
+                if not np.isclose(self.t, cr_t) and step_to_cr_t < self.dt:
+                    self.set_step(step_to_cr_t)
+                    self.step()
+                    t_values.append(self.t)
+                    state_vector_values.append(self.y)
+
+                    step_to_initial_step = self.initial_dt - self.t % self.initial_dt
+                    self.set_step(step_to_initial_step)
+                    self.step()
+                    t_values.append(self.t)
+                    state_vector_values.append(self.y)
+
+                    self.set_step(self.initial_dt)
+                    cr_t = next(cr_times, None)
+                    continue
+            
             self.step()
 
             t_values.append(self.t)
@@ -182,4 +198,4 @@ class myRK():
             math_model.DPITCH_DT = dpitch_dt
             math_model.PITCH_2 = pitch2
 
-        self.__init__(self.__reset_fun, math_model, self.__reset_H_MS, self.__reset_y0, self.__reset_t0, self.__reset_t_bound, self.__dt)
+        self.__init__(self.__reset_fun, math_model, self.__reset_H_MS, self.__reset_y0, self.__reset_critical_times, self.__reset_t0, self.__reset_t_bound, self.__dt)
