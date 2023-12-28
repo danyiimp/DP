@@ -65,7 +65,6 @@ class LMSolver(PDMixin):
         ic("LM HESSIAN ENTRY")
         dt = 0.1
         M_0 = self.math_model._M_0
-        M_F = self.math_model._M_FUEL_MAX
 
         #bps
         self._bp_solver.reset(t_1 - dt, t_2 - dt)
@@ -104,9 +103,9 @@ class LMSolver(PDMixin):
         U_i, m_t1_t2 = self._bp_solver.solve()
         ic("LM HESSIAN 9 BP SOLVED")
 
-        dt1dt1 = ((M_0 - m_t1pdt_t2 - M_F) - 2*(M_0 - m_t1_t2 - M_F) + (M_0 - m_t1mdt_t2 - M_F)) / dt**2
-        dt2dt2 = ((M_0 - m_t1_t2pdt - M_F) - 2*(M_0 - m_t1_t2 - M_F) + (M_0 - m_t1_t2mdt - M_F)) / dt**2
-        dt1dt2 = ((M_0 - m_t1pdt_t2pdt - M_F) - (M_0 - m_t1mdt_t2pdt - M_F) - (M_0 - m_t1pdt_t2mdt - M_F) + (M_0 - m_t1mdt_t2mdt - M_F)) / (4 * dt**2)
+        dt1dt1 = ((M_0 - m_t1pdt_t2) - 2*(M_0 - m_t1_t2) + (M_0 - m_t1mdt_t2)) / dt**2
+        dt2dt2 = ((M_0 - m_t1_t2pdt) - 2*(M_0 - m_t1_t2) + (M_0 - m_t1_t2mdt)) / dt**2
+        dt1dt2 = ((M_0 - m_t1pdt_t2pdt) - (M_0 - m_t1mdt_t2pdt) - (M_0 - m_t1pdt_t2mdt) + (M_0 - m_t1mdt_t2mdt)) / (4 * dt**2)
 
         hessian = np.array([
             [dt1dt1, dt1dt2],
@@ -174,38 +173,32 @@ class LMSolver(PDMixin):
             
             H_i = self._hessian(X_i[0][0], X_i[1][0])
             ic(H_i)
-
-            lm_small_iter_count = 0
-
             
-            ic("LM ITERATION FORMULA ENTRY")
-            ic(alpha_i)
-            lm_small_iter_count += 1
-            
-            #SMALL_ITER
-            #X_i+1
-            X_i = self._iteration(X_i, H_i, alpha_i, grad_g_fun)
-            ic(X_i)
+  
+            while True:
+                ic("LM ITERATION FORMULA ENTRY")
+                ic(alpha_i)
+                X_i = self._iteration(X_i, H_i, alpha_i, grad_g_fun)
+                ic(X_i)
 
-            #Расчет новой минимизируемой функции.
-            bp_solver.reset(X_i[0][0], X_i[1][0])   
-            U_i, m = bp_solver.solve()
+                #Расчет новой минимизируемой функции.
+                bp_solver.reset(X_i[0][0], X_i[1][0])   
+                U_i, m = bp_solver.solve()
 
-            if self._plot_generator:
-                if self._q:
-                    t_values, state_vector_values = self._rk_solver.solve()
-                    results = parseToResults(t_values, state_vector_values)
-                    self._q.put(results)
+                if self._plot_generator:
+                    if self._q:
+                        t_values, state_vector_values = self._rk_solver.solve()
+                        results = parseToResults(t_values, state_vector_values)
+                        self._q.put(results)
 
-            ic("LM ITTERATION FORMULA BP SOLVED")
-            g_fun_new = M_0 - m
+                ic("LM ITTERATION FORMULA BP SOLVED")
+                g_fun_new = M_0 - m
 
-            # g_fun = g_fun_new
-            # break
 
-            if g_fun_new < g_fun:
-                alpha_i *= self._C_1
-            else:
-                alpha_i *= self._C_2
-
-            g_fun = g_fun_new
+                if g_fun_new < g_fun:
+                    alpha_i *= self._C_1
+                    g_fun = g_fun_new
+                    break
+                else:
+                    alpha_i *= self._C_2
+                
