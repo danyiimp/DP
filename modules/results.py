@@ -12,6 +12,8 @@ from icecream import ic
 
 import modules.data as d
 
+from modules.math_model import MathModel
+
 def parseToResults(t_values, state_vector_values):
     """
     Сведение результатов интегрирования, к итоговому виду
@@ -29,11 +31,11 @@ def parseToResults(t_values, state_vector_values):
 def writeToExcel(results: list, filename: str):
     if not d.EXCEL:
         return
-    results = [(t_values, v_x, v_y, x * 1000, y * 1000, m) for t_values, x, y, v_x, v_y, m in results]
+    results = [(t_values, x * 1000, y * 1000, v_x, v_y, m) for t_values, x, y, v_x, v_y, m in results]
     #Для фиксации времени исполнения
     ic()
     #columns = ['t, с', 'm, кг' ,'v_x, м/с', 'v_y, м/с', 'x, км', 'y, км', 'h, км', 'V, м/с', 'r, км', 'ϑ, град','θ_c, град', 'α, град', 'ϕ, град']
-    columns = ["t, с", "x, км", "y, км", "v_x, м/с", "v_y, м/с", "m, кг"]
+    columns = ["t, с", "x, м", "y, м", "v_x, м/с", "v_y, м/с", "m, кг"]
     df = pd.DataFrame(results, columns=columns)
 
     if not os.path.exists("results"):
@@ -44,7 +46,23 @@ def writeToExcel(results: list, filename: str):
     #Для фиксации времени исполнения
     ic()
 
-def createPlot(results: list, num_points: int = 1000, H_MS: float = d.H_MS_11, interactive: bool = d.INTERACTIVE):
+def getAllResults(results: list, mathmodel: MathModel):
+    t, x, y, v_x, v_y, m = zip(*results)
+
+    #Приведение к СИ
+    x = [x_i * 1000 for x_i in x]
+    y = [y_i * 1000 for y_i in y]
+
+    h = [y_i + d.R_MOON for y_i in y]
+
+    v = [mathmodel.getV in zip(v_x, v_y)]
+    r = [(x_i**2 + y_i**2)**(1/2) for x_i, y_i in zip(x, y)]
+
+    # results = [(t_values, x * 1000, y * 1000, v_x, v_y, m) for t_values, x, y, v_x, v_y, m in results]
+    ...
+    
+
+def createPlot(results: list, H_MS: float, num_points: int = 1000, interactive: bool = d.INTERACTIVE):
     """
     :param results: список всех вектор состояний
     :param num_points: количество точек для построения графика
@@ -88,12 +106,6 @@ def createPlot(results: list, num_points: int = 1000, H_MS: float = d.H_MS_11, i
     
     l, = plt.plot(x_results, h_results, visible=False)
 
-    # # Устанавливаем шаг для оси X равным 20
-    # plt.xticks(np.arange(min(x_results), max(x_results)+1, 10))
-
-    # # Устанавливаем шаг для оси Y равным 20
-    # plt.yticks(np.arange(min(y_results), max(y_results)+1, 10))
-
     # Создаем слайдер
     axslider = plt.axes([0.25, 0.1, 0.65, 0.03])
     slider = Slider(axslider, 'TIME', valmin=t_results[0], valmax=t_results[-1], valinit=0)
@@ -131,20 +143,20 @@ def createPlot(results: list, num_points: int = 1000, H_MS: float = d.H_MS_11, i
 
     plt.show()
 
-def plotProccess(q: Queue, num_points: int = 1000, H_MS: float = d.H_MS_11):
+def plotProccess(q: Queue, H_MS: float, num_points: int = 1000):
     fig, ax = plt.subplots()
     ax: Axes
 
-    # plt.gca().set_xlim([-2200, 2200])
-    # plt.gca().set_ylim([-2200, 2200])
     ax.set_aspect("equal")
-    ax.set(xlim=[-500, 1000], ylim=[1000, 2200])
+    ax.set(xlim=[-100, 900], ylim=[1500, 2200])
+    ax.grid(True)
+    ax.set_ylabel("H, [км]", size=14)
+    ax.set_xlabel("X, [км]", size=14)
 
     moon = Circle((0, 0), d.R_MOON, fill=True, color="grey")
     target_orbit = Circle((0, 0), d.R_MOON + H_MS, fill=False, color="red", linestyle="--")
     ax.add_patch(moon)
     ax.add_patch(target_orbit)
-    # plt.show()
     flag = False
     while True:
         if not q.empty():
@@ -165,4 +177,3 @@ def plotProccess(q: Queue, num_points: int = 1000, H_MS: float = d.H_MS_11):
             flag = True
         if flag:
             plt.pause(3)
-            # plt.ion()

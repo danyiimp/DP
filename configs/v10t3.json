@@ -12,6 +12,6 @@
 
     "DEBUG": true,
     "INTERACTIVE": false,
-    "EXCEL": false,
-    "EXCEL_FILE": "m0mns1.xlsx"
+    "EXCEL": true,
+    "EXCEL_FILE": "testNew2.xlsx"
 }

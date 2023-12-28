@@ -5,32 +5,35 @@ import multiprocessing as mp
 
 from icecream import ic
 from typing import Callable
-from modules.integration import myRK
-from modules.boundary_problem import BoundaryProblem, PDMixin
+from modules.integration import RKSolver
+from modules.boundary_problem import BPSolver, PDMixin
 from modules.results import parseToResults
 from modules.data import DEBUG
 
-class LevenbergMarquardt(PDMixin):
+
+class LMSolver(PDMixin):
     _number_of_calc = 0
-    def __init__(self, bp_solver: BoundaryProblem, accuracy, C_1, C_2, ALPHA_0):
+    def __init__(self, bp_solver: BPSolver, plot_generator: Callable = None):
         self._bp_solver = bp_solver
         self._rk_solver = bp_solver._rk_solver
+        self._plot_generator = plot_generator
         self.math_model = bp_solver.math_model
         self._T_1 = self.math_model.T_1
         self._T_2 = self.math_model.T_2
-        self._epsilon = accuracy
-        self._C_1 = C_1
-        self._C_2 = C_2
-        self._ALPHA_0 = ALPHA_0
+        self._C_1 = 0.1
+        self._C_2 = 10
 
     @staticmethod
     def _iteration(X_i, H_i, alpha_i, grad_g):
-        return X_i - np.linalg.inv(H_i + alpha_i * np.eye(2)) @ grad_g
+        addition = np.linalg.inv(H_i + alpha_i * np.eye(2)) @ grad_g
+        ic(addition)
+        return X_i - addition
+        # return X_i - np.linalg.inv(H_i + alpha_i * np.eye(2)) @ grad_g
 
     def _grad(self, t_1, t_2):
         ic("LM GRAD ENTRY")
-        dt1 = 0.01
-        dt2 = 0.01
+        dt1 = 0.1
+        dt2 = 0.1
         M_0 = self.math_model._M_0
 
         self._bp_solver.reset(t_1 - dt1, t_2)
@@ -49,7 +52,6 @@ class LevenbergMarquardt(PDMixin):
         U_i, m22 = self._bp_solver.solve()
         ic("LM GRAD 4 BP SOLVED")
 
-
         grad1 = self._partial_derivate(M_0 - m12, M_0 - m11, dt1)
         grad2 = self._partial_derivate(M_0 - m22, M_0 - m21, dt2)
 
@@ -58,92 +60,65 @@ class LevenbergMarquardt(PDMixin):
             [grad2]
         ])
         return grad_g_fun
-    
+            
     def _hessian(self, t_1, t_2):
         ic("LM HESSIAN ENTRY")
-        dt1 = 0.01
-        dt2 = 0.01
+        dt = 0.1
         M_0 = self.math_model._M_0
+        M_F = self.math_model._M_FUEL_MAX
 
-
-        # dt1dt2
-        self._bp_solver.reset(t_1 - dt1, t_2 - 2 * dt2)
-        U_i, m11 = self._bp_solver.solve()
+        #bps
+        self._bp_solver.reset(t_1 - dt, t_2 - dt)
+        U_i, m_t1mdt_t2mdt = self._bp_solver.solve()
         ic("LM HESSIAN 1 BP SOLVED")
-
-        self._bp_solver.reset(t_1 + dt1, t_2 - 2 * dt2)
-        U_i, m12 = self._bp_solver.solve()
+        
+        self._bp_solver.reset(t_1 + dt, t_2 - dt)
+        U_i, m_t1pdt_t2mdt = self._bp_solver.solve()
         ic("LM HESSIAN 2 BP SOLVED")
 
-        self._bp_solver.reset(t_1 - dt1, t_2 + 2 * dt2)
-        U_i, m21 = self._bp_solver.solve()
+        self._bp_solver.reset(t_1 - dt, t_2 + dt)
+        U_i, m_t1mdt_t2pdt = self._bp_solver.solve()
         ic("LM HESSIAN 3 BP SOLVED")
 
-        self._bp_solver.reset(t_1 + dt1, t_2 + 2 * dt2)
-        U_i, m22 = self._bp_solver.solve()
+        self._bp_solver.reset(t_1 + dt, t_2 + dt)
+        U_i, m_t1pdt_t2pdt = self._bp_solver.solve()
         ic("LM HESSIAN 4 BP SOLVED")
 
-        f1 = self._partial_derivate(M_0 - m12, M_0 - m11, dt1)
-        f2 = self._partial_derivate(M_0 - m22, M_0 - m21, dt1)
-        
-        dt1dt2 = self._partial_derivate(f2, f1, dt2)
-
-
-        # dt1dt1
-        self._bp_solver.reset(t_1 + dt1 + dt2, t_2)
-        U_i, m11 = self._bp_solver.solve()
+        self._bp_solver.reset(t_1, t_2 - dt)
+        U_i, m_t1_t2mdt = self._bp_solver.solve()
         ic("LM HESSIAN 5 BP SOLVED")
-        
-        self._bp_solver.reset(t_1 + dt1 - dt2, t_2)
-        U_i, m12 = self._bp_solver.solve()
+
+        self._bp_solver.reset(t_1, t_2 + dt)
+        U_i, m_t1_t2pdt = self._bp_solver.solve()
         ic("LM HESSIAN 6 BP SOLVED")
 
-        self._bp_solver.reset(t_1 - dt1 + dt2, t_2)
-        U_i, m21 = self._bp_solver.solve()
+        self._bp_solver.reset(t_1 - dt, t_2)
+        U_i, m_t1mdt_t2 = self._bp_solver.solve()
         ic("LM HESSIAN 7 BP SOLVED")
-        
-        self._bp_solver.reset(t_1 - dt1 - dt2, t_2)
-        U_i, m22 = self._bp_solver.solve()
+
+        self._bp_solver.reset(t_1 + dt, t_2)
+        U_i, m_t1pdt_t2 = self._bp_solver.solve()
         ic("LM HESSIAN 8 BP SOLVED")
-        
-        f1 = self._partial_derivate(M_0 - m12, M_0 - m11, dt1)
-        f2 = self._partial_derivate(M_0 - m22, M_0 - m21, dt1)
-        
-        dt1dt1 = self._partial_derivate(f2, f1, dt2)
 
-        
-        # dt2dt2        
-        self._bp_solver.reset(t_1, t_2 + dt1 + dt2)
-        U_i, m11 = self._bp_solver.solve()
+        self._bp_solver.reset(t_1, t_2)
+        U_i, m_t1_t2 = self._bp_solver.solve()
         ic("LM HESSIAN 9 BP SOLVED")
-        
-        self._bp_solver.reset(t_1, t_2 + dt1 - dt2)
-        U_i, m12 = self._bp_solver.solve()
-        ic("LM HESSIAN 10 BP SOLVED")
 
-        self._bp_solver.reset(t_1, t_2 - dt1 + dt2)
-        U_i, m21 = self._bp_solver.solve()
-        ic("LM HESSIAN 11 BP SOLVED")
-        
-        self._bp_solver.reset(t_1, t_2 - dt1 - dt2)
-        U_i, m22 = self._bp_solver.solve()
-        ic("LM HESSIAN 12 BP SOLVED")
-        
-        f1 = self._partial_derivate(M_0 - m12, M_0 - m11, dt1)
-        f2 = self._partial_derivate(M_0 - m22, M_0 - m21, dt1)
-        
-        dt2dt2 = self._partial_derivate(f2, f1, dt2)
+        dt1dt1 = ((M_0 - m_t1pdt_t2 - M_F) - 2*(M_0 - m_t1_t2 - M_F) + (M_0 - m_t1mdt_t2 - M_F)) / dt**2
+        dt2dt2 = ((M_0 - m_t1_t2pdt - M_F) - 2*(M_0 - m_t1_t2 - M_F) + (M_0 - m_t1_t2mdt - M_F)) / dt**2
+        dt1dt2 = ((M_0 - m_t1pdt_t2pdt - M_F) - (M_0 - m_t1mdt_t2pdt - M_F) - (M_0 - m_t1pdt_t2mdt - M_F) + (M_0 - m_t1mdt_t2mdt - M_F)) / (4 * dt**2)
 
         hessian = np.array([
             [dt1dt1, dt1dt2],
             [dt1dt2, dt2dt2]
-        ])    
-        return hessian
+        ])
 
+        return hessian
+    
     def solve(self):
         ic("LM ENTRY")
-        accuracy = 0.1
-        alpha_i = 1000
+        accuracy = 0.01
+        alpha_i = 0.001
         
         M_0 = self.math_model._M_0
         bp_solver = self._bp_solver
@@ -153,9 +128,20 @@ class LevenbergMarquardt(PDMixin):
             [self._T_2]
         ])
 
+        if self._plot_generator:
+            self._q = mp.Queue()
+            self._p = mp.Process(target=self._plot_generator, args=(self._q,))
+            self._p.start()
+
         #Расчет минимизируемой функции.
         U_i, m = bp_solver.solve()
-        
+
+        if self._plot_generator:
+            if self._q:
+                t_values, state_vector_values = self._rk_solver.solve()
+                results = parseToResults(t_values, state_vector_values)
+                self._q.put(results)
+
         g_fun = M_0 - m
 
         error_list = []
@@ -178,37 +164,48 @@ class LevenbergMarquardt(PDMixin):
                 X_min = X_i
                 g_fun_min = g_fun
                 bp_solver.reset(X_i[0][0], X_i[1][0])
+
+                if self._plot_generator: 
+                    if self._p:
+                        self._p.terminate()
+                        self._p = None
+                        self._q = None
                 return X_min, g_fun_min
             
             H_i = self._hessian(X_i[0][0], X_i[1][0])
             ic(H_i)
 
             lm_small_iter_count = 0
-            while True:
-                ic("LM SMALL ITERATION ENTRY")
-                ic(alpha_i)
-                lm_small_iter_count += 1
-                
-                #SMALL_ITER
-                #X_i+1
-                X_i = self._iteration(X_i, H_i, alpha_i, grad_g_fun)
-                ic(X_i)
 
-                #Расчет новой минимизируемой функции.
-                bp_solver.reset(X_i[0][0], X_i[1][0])
-                U_i, m = bp_solver.solve()
-                ic("LM SMALL ITTERATION BP SOLVED")
-                g_fun_new = M_0 - m
+            
+            ic("LM ITERATION FORMULA ENTRY")
+            ic(alpha_i)
+            lm_small_iter_count += 1
+            
+            #SMALL_ITER
+            #X_i+1
+            X_i = self._iteration(X_i, H_i, alpha_i, grad_g_fun)
+            ic(X_i)
 
-                if lm_small_iter_count > 50:
-                    ic(g_fun_new)
-                    ic(g_fun_min)
-                    raise Exception("Давай по новой.")
+            #Расчет новой минимизируемой функции.
+            bp_solver.reset(X_i[0][0], X_i[1][0])   
+            U_i, m = bp_solver.solve()
 
-                if g_fun_new < g_fun:
-                    #alpha_i+1
-                    alpha_i *= self._C_1
-                    g_fun = g_fun_new
-                    break
-                else:
-                    alpha_i *= self._C_2
+            if self._plot_generator:
+                if self._q:
+                    t_values, state_vector_values = self._rk_solver.solve()
+                    results = parseToResults(t_values, state_vector_values)
+                    self._q.put(results)
+
+            ic("LM ITTERATION FORMULA BP SOLVED")
+            g_fun_new = M_0 - m
+
+            # g_fun = g_fun_new
+            # break
+
+            if g_fun_new < g_fun:
+                alpha_i *= self._C_1
+            else:
+                alpha_i *= self._C_2
+
+            g_fun = g_fun_new

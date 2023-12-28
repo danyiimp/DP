@@ -1,4 +1,4 @@
-from numpy import pi, arcsin, cos, sin
+from numpy import pi, arcsin, cos, sin, arccos
 from icecream import ic
 
 import modules.data as d
@@ -103,7 +103,19 @@ class MathModel():
             return self._PITCH_2
         else:
             return 0
-        
+
+    def getAbsVelocity(self, v_x: float, v_y: float) -> float:
+        """
+        :param v_x: скорость по оси X
+        :param v_y: скорость по оси Y
+        :return: абсолютная скорость
+        """
+        return (v_x**2 + v_y**2)**(1/2)
+    
+    def getAngularDistance(self, x: float, y: float) -> float:
+        r = self.getRadiusVectorValue(x, y)
+        return arccos(x / r)
+            
     def getThrust(self, t: float) -> float:
         """
         :param t: текущее время

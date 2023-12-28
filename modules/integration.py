@@ -26,7 +26,7 @@ def integrateFunction(math_model: MathModel) -> Callable:
         return new_state_vector
     return partial(realIntegrateFunction, math_model=math_model)
 
-class myRK():
+class RKSolver():
     #Количество решений этим методом. Для нейминга progressBar
     _number_of_calc = 0
     def __init__(self, fun, math_model: MathModel, H_MS: float, y0, critical_times: list, t0=d.T_0, t_bound=d.T_END, dt=d.DELTA_T):
@@ -79,10 +79,10 @@ class myRK():
         if current_step % update_step_count != 0 and current_step != total_steps and current_step != 1:
             return
         progress = current_step / total_steps
-        bar_length = 20  # Modify this to change the length of the progress bar
+        bar_length = 20 
         block = int(round(bar_length * progress))
         text = "\rRK №{0} progress: [{1}] {2:.1f}%".format(
-            str(myRK._number_of_calc).zfill(2),
+            str(RKSolver._number_of_calc).zfill(2),
             "#" * block + "-" * (bar_length - block), 
             progress * 100
         )
@@ -109,7 +109,7 @@ class myRK():
         """
         :param stop_on_boundary: остановить интегрирование при достижении граничных условий
         """
-        myRK._number_of_calc += 1
+        RKSolver._number_of_calc += 1
         
         #Инициализация списков для хранения результатов
         t_values = []
@@ -118,16 +118,6 @@ class myRK():
         cr_t = next(cr_times, None)
         
         while self.status == "running":
-            #TODO FIX THIS
-            if stop_on_boundary and self.t > d.T_3:
-                self.status == "finished"
-                print(f" self.t > {d.T_3} stopped")
-                break
-            # if self.y[4] <= self.math_model._M_0 - self.math_model._M_FUEL_MAX:
-            #     # ic(self.t, self.y[4])
-            #     print("\nМАССА УШЛА")
-            #     break
-
             #Реализация уменьшения шага для повышения точности конечной скорости
             if not self.math_model.off_thrust:
                 stepped_over, deviation = self.math_model.endCondition(self._H_MS, self.y[2], self.y[3], self.t)
@@ -192,6 +182,7 @@ class myRK():
         if t_1 is not None and t_2 is not None:
             math_model.T_1 = t_1
             math_model.T_2 = t_2
+            self.__reset_critical_times = [t_1, t_2]
 
         #Установка новых параметров в мат модель
         if dpitch_dt is not None and pitch2 is not None:

@@ -2,16 +2,16 @@
     "_info": "Конфигурационный файл. Откройте README.md с комментариями к переменным",
 
     "N": 10,
-    "T_1": 388.07336765,
-    "T_2": 781.40023909,
+    "T_1": 471.66060934,
+    "T_2": 735.5502603,
     "T_3": 2000,
     "T_END": 2000,
     "DEG": false,
-    "DPITCH_DT": -0.00473296,
-    "PITCH_2":  -0.31601889,
+    "DPITCH_DT": -0.00386037,
+    "PITCH_2":  -0.29266358,
 
     "DEBUG": true,
     "INTERACTIVE": false,
-    "EXCEL": false,
-    "EXCEL_FILE": "m0mns1.xlsx"
+    "EXCEL": true,
+    "EXCEL_FILE": "testNew2.xlsx"
 }

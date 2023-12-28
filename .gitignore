@@ -3,5 +3,4 @@ __pycache__
 test*.py
 results
 config_default.json
-configs/
 *.ipynb
